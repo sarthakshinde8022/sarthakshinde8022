@@ -4,6 +4,9 @@ Hand-author a neofetch-style info card SVG: a terminal title bar, then
 key/value rows that fade + slide in on a short stagger, like the panel
 is printing next to the ASCII portrait.
 
+A value can contain "\n" to wrap onto multiple lines within its row
+(useful for Highlights as it grows) - row height adjusts automatically.
+
 Set STATIC=1 to emit a frozen final frame (handy for local Quick Look
 previews where SVG animation doesn't play).
 """
@@ -13,21 +16,22 @@ OUTPUT_PATH = os.path.join(os.path.dirname(__file__), "..", "info-card.svg")
 STATIC = os.environ.get("STATIC") == "1"
 
 # --- content: edit these to keep the card current ----------------------
-TITLE = "avi@github"
+TITLE = "sarthak@github"
 ROWS = [
     ("Now", "B.Tech ECE (AI/ML) student, DES Pune University"),
-    ("Base", "Embedded systems - STM32 / ESP32"),
+    ("Base", "Digital Image Processing (PDIP)"),
     ("Stack", "Python - Embedded C - MySQL - Streamlit"),
-    ("Highlights", "ECO-EYE (IoT security) - Art3mis (content) - JayBot (Discord RPG)"),
+    ("Highlights", "ECO-EYE (IoT security) - Art3mis (content) - JayBot (Discord RPG)\nDBMS Fleet Logbook - Derain Dehazing"),
 ]
 # -----------------------------------------------------------------------
 
 WIDTH = 490
-ROW_H = 34
 TITLEBAR_H = 30
 PAD_X = 18
 FIRST_ROW_Y = TITLEBAR_H + 26
-HEIGHT = FIRST_ROW_Y + ROW_H * len(ROWS) + 16
+LABEL_TO_VALUE = 17     # gap from label baseline to first value line
+VALUE_LINE_H = 15        # gap between wrapped value lines
+ROW_GAP = 14              # gap after a row's last value line, before next label
 
 BG = "#0d1117"
 BORDER = "#30363d"
@@ -45,6 +49,18 @@ def row_style(index: int) -> str:
 
 def main():
     parts = []
+
+    # First pass: compute each row's starting y and total card height,
+    # since a multi-line value changes how tall a row is.
+    row_layout = []
+    y_cursor = FIRST_ROW_Y
+    for label, value in ROWS:
+        lines = value.split("\n")
+        row_layout.append((label, lines, y_cursor))
+        y_cursor += LABEL_TO_VALUE + VALUE_LINE_H * (len(lines) - 1) + ROW_GAP
+
+    HEIGHT = y_cursor + 8
+
     parts.append(
         f'<svg viewBox="0 0 {WIDTH} {HEIGHT}" xmlns="http://www.w3.org/2000/svg" '
         f'font-family="ui-monospace, SFMono-Regular, Menlo, monospace">'
@@ -78,16 +94,17 @@ def main():
         f'font-size="12" fill="#8b949e">{TITLE}</text>'
     )
 
-    # Key/value rows
-    for i, (label, value) in enumerate(ROWS):
-        y = FIRST_ROW_Y + i * ROW_H
+    # Key/value rows (value may span multiple lines)
+    for i, (label, lines, y) in enumerate(row_layout):
         style = row_style(i)
         cls = "" if STATIC else 'class="row"'
         parts.append(f'<g {cls} style="{style}">')
         parts.append(
             f'<text x="{PAD_X}" y="{y}" font-size="13" font-weight="bold" fill="{LABEL_COLOR}">{label}:</text>'
         )
-        parts.append(f'<text x="{PAD_X}" y="{y + 17}" font-size="12" fill="{VALUE_COLOR}">{value}</text>')
+        for li, line in enumerate(lines):
+            line_y = y + LABEL_TO_VALUE + li * VALUE_LINE_H
+            parts.append(f'<text x="{PAD_X}" y="{line_y}" font-size="12" fill="{VALUE_COLOR}">{line}</text>')
         parts.append("</g>")
 
     parts.append("</svg>")
